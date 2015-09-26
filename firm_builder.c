@@ -122,12 +122,12 @@ int main(int argc, char* argv[])
 			return 6;
 		}
 
-		section_type = (unsigned int)strtol(argv[i+5], NULL, 0);
+		sscanf(argv[i+5], "%x", &section_type);
 		if (section_type > 2)
 		{
 			printf("Warning: section type %i might be unsupported.\n", section_type);
 		}
-		section_addr = (unsigned int)strtol(argv[i+4], NULL, 0);
+		sscanf(argv[i+4], "%x", &section_addr);
 
 		cur_offset += addSection(section_file, i/3, section_addr, cur_offset, section_size, section_type);
 
@@ -138,9 +138,10 @@ int main(int argc, char* argv[])
 	firm_header *hdr = (firm_header *)firm_buf;
 	memcpy(hdr->magic, firm_magic, 4);
 	//memcpy(firm_buf + 0x10, haxx_magic, 4);
-	unsigned int firm_entry = (unsigned int)strtol(argv[3], NULL, 0);
+	unsigned int firm_entry;
+	sscanf(argv[3], "%x", &firm_entry);
 	memcpy(hdr->entrypointarm11, &firm_entry, 4);
-	firm_entry = (unsigned int)strtol(argv[2], NULL, 0);
+	sscanf(argv[2], "%x", &firm_entry);
 	memcpy(hdr->entrypointarm9, &firm_entry, 4);
 	// this should be replaced manually
 	memset(hdr->signature, 0xAA, 0x100);
