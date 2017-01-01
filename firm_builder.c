@@ -8,8 +8,7 @@
 #define FIRM_MAX_SIZE	0x400000
 typedef unsigned char u8;
 
-static char *firm_magic = "FIRM";
-static char *haxx_magic = "HAXX";
+static const char *firm_magic = "FIRM";
 
 // structs from ctrtool
 typedef struct
@@ -34,7 +33,7 @@ typedef struct
 
 unsigned char *firm_buf;
 
-unsigned int addSection(FILE *sectionf, unsigned int index, unsigned int addr,
+static unsigned int addSection(FILE *sectionf, unsigned int index, unsigned int addr,
 	unsigned int offset, unsigned int size, unsigned int type)
 {
 	unsigned int padding;
@@ -51,7 +50,8 @@ unsigned int addSection(FILE *sectionf, unsigned int index, unsigned int addr,
 	size_aligned = size + padding;
 
 	section_buf = (unsigned char *)firm_buf + offset;
-	fread(section_buf, 1, size, sectionf);
+	if (fread(section_buf, 1, size, sectionf) != size)
+		return 0;
 
 	// fill padding
 	memset(section_buf + size, 0x00, padding);
@@ -73,11 +73,19 @@ int main(int argc, char* argv[])
 	unsigned int section_count;
 	struct stat file_stat;
 	FILE *fout;
+	FILE *section_file;
+	unsigned int section_size;
+	unsigned int section_addr;
+	unsigned char section_type;
+	unsigned int cur_offset;	// current offset in firm_buf
+	unsigned int firm_entry;
 
 	if (argc < 7)
 	{
-		printf("firm_builder by derrek\n");
-		printf("Usage: %s <output file> <arm9 entry addr> <arm11 entry addr> <section0 loading addr> <section0 copy method> <section0 binary> <section1 loading addr> ...\n", argv[0]);
+		printf("firm_builder for 3DS (C) 2016-2017 by derrek\n");
+		printf("Usage: %s <output file> <arm9 entry addr> <arm11 entry addr> ", argv[0]);
+		printf("<section0 loading addr> <section0 copy method> <section0 binary> ");
+		printf("<section1 loading addr> ...\n");
 		printf("The maximum section count is 4.\n");
 		return 1;
 	}
@@ -90,61 +98,105 @@ int main(int argc, char* argv[])
 	}
 
 	firm_buf = (unsigned char *)malloc(FIRM_MAX_SIZE);
-	memset(firm_buf, 0x00, 0x100);
+	if (firm_buf == NULL)
+	{
+		printf("Error: Out of memory.\n");
+		return 7;
+	}
 	
-	FILE *section_file;
-	unsigned int section_size;
-	unsigned int section_addr;
-	unsigned char section_type;
-	unsigned int cur_offset = 0x200;	// current offset in firm_buf
+	memset(firm_buf, 0x00, 0x100);
+
+	
+	/* setup firm header */
+	
+	firm_header *hdr = (firm_header *)firm_buf;
+	memcpy(hdr->magic, firm_magic, 4);
+	
+	if (sscanf(argv[3], "%x", &firm_entry) != 1)
+	{
+		printf("Invalid ARM11 entrypoint addr %s.\n", argv[3]);
+		return 10;
+	}
+	memcpy(hdr->entrypointarm11, &firm_entry, 4);
+	
+	if (sscanf(argv[2], "%x", &firm_entry) != 1)
+	{
+		printf("Invalid ARM11 entrypoint addr %s.\n", argv[3]);
+		return 11;
+	}
+	memcpy(hdr->entrypointarm9, &firm_entry, 4);
+	
+	// this should be replaced manually
+	memset(hdr->signature, 0xAA, 0x100);
+	
+	
+	/* populate firm body */
+	
+	cur_offset = 0x200;
 
 	// loop through all sections
-	for (unsigned int i = 0; i < section_count*3; i+=3)
+	for (unsigned int i = 0; i < section_count * 3; i+=3)
 	{
-		if (stat(argv[i+6], &file_stat) == -1)
+		const char *section_addr_string = argv[i+4];
+		const char *section_type_string = argv[i+5];
+		const char *section_filepath = argv[i+6];
+		
+		if (stat(section_filepath, &file_stat) == -1)
 		{
-			printf("Failed to stat %s\n", argv[i+6]);
+			printf("Failed to stat %s.\n", section_filepath);
 			return 4;
 		}
 
 		section_size = file_stat.st_size;
 		unsigned int padding = (0x200 - (section_size % 0x200)) % 0x200;
-		if ((section_size + padding > FIRM_MAX_SIZE - 0x200) || (section_size + padding + cur_offset > FIRM_MAX_SIZE - 0x200))
+		const unsigned int real_max_size = FIRM_MAX_SIZE - sizeof(firm_header);
+		
+		if ((section_size > real_max_size) ||
+			(section_size + padding > real_max_size) ||
+			(section_size + padding + cur_offset > real_max_size))
 		{
-			printf("Not enough space to fit section %s into the FIRM image %s\n", argv[i+6], argv[i+1]);
+			printf("Not enough space to fit section %s into the FIRM image.\n",
+					section_filepath);
 			return 5;
 		}
 
-		section_file = fopen(argv[i+6], "rb");
+		section_file = fopen(section_filepath, "rb");
 		if (section_file == NULL)
 		{
-			printf("Failed to fopen section file %s.\n", argv[i+6]);
+			printf("Failed to fopen section file %s.\n", section_filepath);
 			return 6;
 		}
 
-		sscanf(argv[i+5], "%x", &section_type);
+		if (sscanf(section_type_string, "%x", &section_type) != 1)
+		{
+			printf("Invalid section type %s.\n", section_type_string);
+			return 8;
+		}
+		
 		if (section_type > 2)
 		{
 			printf("Warning: section type %i might be unsupported.\n", section_type);
 		}
-		sscanf(argv[i+4], "%x", &section_addr);
+		
+		if (sscanf(section_addr_string, "%x", &section_addr) != 1)
+		{
+			printf("Invalid section address %s.\n", section_addr_string);
+			return 9;
+		}
 
-		cur_offset += addSection(section_file, i/3, section_addr, cur_offset, section_size, section_type);
+		unsigned int bytes_added = addSection(section_file, i/3, section_addr, cur_offset,
+									section_size, section_type);
 
 		fclose(section_file);
+		
+		if (bytes_added == 0)
+		{
+			printf("Invalid section file.\n");
+			return 12;
+		}
+		
+		cur_offset += bytes_added;
 	}
-
-	// setup firm header
-	firm_header *hdr = (firm_header *)firm_buf;
-	memcpy(hdr->magic, firm_magic, 4);
-	//memcpy(firm_buf + 0x10, haxx_magic, 4);
-	unsigned int firm_entry;
-	sscanf(argv[3], "%x", &firm_entry);
-	memcpy(hdr->entrypointarm11, &firm_entry, 4);
-	sscanf(argv[2], "%x", &firm_entry);
-	memcpy(hdr->entrypointarm9, &firm_entry, 4);
-	// this should be replaced manually
-	memset(hdr->signature, 0xAA, 0x100);
 
 	fout = fopen(argv[1], "wb");
 	if (fout == NULL)
@@ -152,7 +204,9 @@ int main(int argc, char* argv[])
 		printf("Failed to fopen output file for writing.\n");
 		return 2;
 	}
+	
 	fwrite(firm_buf, cur_offset, 1, fout);
+	
 	fclose(fout);
 
 	return 0;
