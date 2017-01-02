@@ -1,3 +1,22 @@
+/*
+ *  firm_builder is a tool for generating Nintendo 3DS FIRM containers.
+ *  Copyright (C) 2015-2017 derrek
+ *
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/
+ */
+ 
+ 
 #include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>
@@ -82,7 +101,7 @@ int main(int argc, char* argv[])
 
 	if (argc < 7)
 	{
-		printf("firm_builder for 3DS (C) 2016-2017 by derrek\n");
+		printf("firm_builder for 3DS (C) 2015-2017 derrek\n");
 		printf("Usage: %s <output file> <arm9 entry addr> <arm11 entry addr> ", argv[0]);
 		printf("<section0 loading addr> <section0 copy method> <section0 binary> ");
 		printf("<section1 loading addr> ...\n");
