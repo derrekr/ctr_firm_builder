@@ -19,7 +19,7 @@
  
 #include <stdio.h>
 #include <stdlib.h>
-#include <strings.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include "polarssl/sha2.h"
