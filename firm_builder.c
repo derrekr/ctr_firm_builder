@@ -95,7 +95,7 @@ int main(int argc, char* argv[])
 	FILE *section_file;
 	unsigned int section_size;
 	unsigned int section_addr;
-	unsigned char section_type;
+	unsigned int section_type;
 	unsigned int cur_offset;	// current offset in firm_buf
 	unsigned int firm_entry;
 
